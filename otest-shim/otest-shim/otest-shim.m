@@ -607,6 +607,26 @@ static const char *DyldImageStateChangeHandler(enum dyld_image_states state,
   return NULL;
 }
 
+static void UpdateListOfTestsToRun()
+{
+  static NSString * const testListFileKey = @"OTEST_TESTLIST_FILE";
+  static NSString * const testingFrameworkFilterTestArgsKeyKey = @"OTEST_FILTER_TEST_ARGS_KEY";
+
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  NSString *testListFilePath = [defaults objectForKey:testListFileKey];
+  NSString *testingFrameworkFilterTestArgsKey = [defaults objectForKey:testingFrameworkFilterTestArgsKeyKey];
+  if (!testListFilePath && !testingFrameworkFilterTestArgsKey) {
+    return;
+  }
+  NSCAssert(testListFilePath, @"Path to file with list of tests should be specified");
+  NSCAssert(testingFrameworkFilterTestArgsKey, @"Testing framework filter test args key should be specified");
+
+  NSError *readError = nil;
+  NSString *testList = [NSString stringWithContentsOfFile:testListFilePath encoding:NSUTF8StringEncoding error:&readError];
+  NSCAssert(testList, @"Couldn't read file at path %@", testListFilePath);
+  [defaults setValue:testList forKey:testingFrameworkFilterTestArgsKey];
+}
+
 __attribute__((constructor)) static void EntryPoint()
 {
   const char *stdoutFileKey = "OTEST_SHIM_STDOUT_FILE";
@@ -625,6 +645,8 @@ __attribute__((constructor)) static void EntryPoint()
     __stderr = fdopen(stderrHandle, "w");
   }
 
+  UpdateListOfTestsToRun();
+
   // We need to swizzle SenTestLog (part of SenTestingKit), but the test bundle
   // which links SenTestingKit hasn't been loaded yet.  Let's register to get
   // notified when libraries are initialized and we'll watch for SenTestingKit.
@@ -637,4 +659,3 @@ __attribute__((constructor)) static void EntryPoint()
 
   __enableWriteInterception = YES;
 }
-
